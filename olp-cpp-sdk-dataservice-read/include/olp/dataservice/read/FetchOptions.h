@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <olp/core/client/FetchOptions.h>
+
 namespace olp {
 namespace dataservice {
 namespace read {

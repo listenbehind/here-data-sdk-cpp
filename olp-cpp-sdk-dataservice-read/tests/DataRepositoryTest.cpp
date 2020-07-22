@@ -23,6 +23,7 @@
 #include <mocks/NetworkMock.h>
 #include <olp/core/cache/CacheSettings.h>
 #include <olp/core/cache/KeyValueCache.h>
+#include <olp/core/client/ApiLookupClient.h>
 #include <olp/core/client/OlpClientFactory.h>
 #include <olp/core/client/OlpClientSettings.h>
 #include <olp/core/client/OlpClientSettingsFactory.h>
@@ -74,6 +75,8 @@ class DataRepositoryTest : public ::testing::Test {
 
   std::shared_ptr<olp::client::OlpClientSettings> settings_;
   std::shared_ptr<NetworkMock> network_mock_;
+  std::shared_ptr<olp::client::ApiLookupClient> lookup_client_;
+  olp::client::HRN hrn_;
 };
 
 void DataRepositoryTest::SetUp() {
@@ -82,6 +85,10 @@ void DataRepositoryTest::SetUp() {
   settings_->cache =
       olp::client::OlpClientSettingsFactory::CreateDefaultCache({});
   settings_->network_request_handler = network_mock_;
+
+  hrn_ = olp::client::HRN(GetTestCatalog());
+  lookup_client_ =
+      std::make_shared<olp::client::ApiLookupClient>(hrn_, *settings_);
 }
 
 void DataRepositoryTest::TearDown() {
@@ -113,7 +120,8 @@ TEST_F(DataRepositoryTest, GetBlobData) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
 
   ASSERT_TRUE(response.IsSuccessful());
 }
@@ -133,7 +141,8 @@ TEST_F(DataRepositoryTest, GetBlobDataApiLookupFailed403) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
 
   ASSERT_FALSE(response.IsSuccessful());
 }
@@ -144,7 +153,8 @@ TEST_F(DataRepositoryTest, GetBlobDataNoDataHandle) {
   olp::client::HRN hrn(GetTestCatalog());
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
   ASSERT_FALSE(response.IsSuccessful());
 }
 
@@ -168,7 +178,8 @@ TEST_F(DataRepositoryTest, GetBlobDataFailedDataFetch403) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
 
   ASSERT_FALSE(response.IsSuccessful());
 }
@@ -194,14 +205,15 @@ TEST_F(DataRepositoryTest, GetBlobDataCache) {
   // This should download data from network and cache it
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
 
   ASSERT_TRUE(response.IsSuccessful());
 
   // This call should not do any network calls and use already cached values
   // instead
   response = olp::dataservice::read::repository::DataRepository::GetBlobData(
-      hrn, kLayerId, kService, request, context, *settings_);
+      *lookup_client_, hrn, kLayerId, kService, request, context, *settings_);
 
   ASSERT_TRUE(response.IsSuccessful());
 }
@@ -229,7 +241,8 @@ TEST_F(DataRepositoryTest, GetBlobDataImmediateCancel) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
   ASSERT_EQ(response.GetError().GetErrorCode(),
             olp::client::ErrorCode::Cancelled);
 }
@@ -260,7 +273,8 @@ TEST_F(DataRepositoryTest, GetBlobDataInProgressCancel) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetBlobData(
-          hrn, kLayerId, kService, request, context, *settings_);
+          *lookup_client_, hrn, kLayerId, kService, request, context,
+          *settings_);
   ASSERT_EQ(response.GetError().GetErrorCode(),
             olp::client::ErrorCode::Cancelled);
 }
@@ -293,7 +307,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTile) {
     olp::client::CancellationContext context;
     auto response =
         olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-            hrn, kLayerId, request, version, context, *settings_);
+            *lookup_client_, hrn, kLayerId, request, version, context,
+            *settings_);
     ASSERT_TRUE(response.IsSuccessful());
   }
 
@@ -317,7 +332,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTile) {
     olp::client::CancellationContext context;
     auto response =
         olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-            hrn, kLayerId, request, version, context, *settings_);
+            *lookup_client_, hrn, kLayerId, request, version, context,
+            *settings_);
     ASSERT_TRUE(response.IsSuccessful());
   }
 }
@@ -356,7 +372,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTileOnlineOnly) {
     olp::client::CancellationContext context;
     auto response =
         olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-            hrn, kLayerId, request, version, context, *settings_);
+            *lookup_client_, hrn, kLayerId, request, version, context,
+            *settings_);
     ASSERT_TRUE(response.IsSuccessful());
   }
 }
@@ -374,7 +391,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTileImmediateCancel) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-          hrn, kLayerId, request, version, context, *settings_);
+          *lookup_client_, hrn, kLayerId, request, version, context,
+          *settings_);
 
   ASSERT_EQ(response.GetError().GetErrorCode(),
             olp::client::ErrorCode::Cancelled);
@@ -409,7 +427,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTileInProgressCancel) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-          hrn, kLayerId, request, version, context, *settings_);
+          *lookup_client_, hrn, kLayerId, request, version, context,
+          *settings_);
 
   ASSERT_EQ(response.GetError().GetErrorCode(),
             olp::client::ErrorCode::Cancelled);
@@ -436,7 +455,8 @@ TEST_F(DataRepositoryTest, GetVersionedDataTileReturnEmpty) {
 
   auto response =
       olp::dataservice::read::repository::DataRepository::GetVersionedTile(
-          hrn, kLayerId, request, version, context, *settings_);
+          *lookup_client_, hrn, kLayerId, request, version, context,
+          *settings_);
 
   ASSERT_FALSE(response.IsSuccessful());
   ASSERT_EQ(response.GetError().GetErrorCode(),

@@ -76,6 +76,13 @@ class CORE_API ApiLookupClient final {
 
   explicit ApiLookupClient(const HRN& catalog,
                            const OlpClientSettings& settings);
+
+  /// Movable and copyable
+  ApiLookupClient(const ApiLookupClient& other);
+  ApiLookupClient& operator=(const ApiLookupClient& other);
+  ApiLookupClient(ApiLookupClient&& other);
+  ApiLookupClient& operator=(ApiLookupClient&& other);
+
   ~ApiLookupClient();
 
   /**

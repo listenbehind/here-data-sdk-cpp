@@ -28,6 +28,15 @@ ApiLookupClient::ApiLookupClient(const HRN& catalog,
                                  const OlpClientSettings& settings)
     : impl_(std::make_shared<ApiLookupClientImpl>(catalog, settings)) {}
 
+ApiLookupClient::ApiLookupClient(const ApiLookupClient& other) = default;
+
+ApiLookupClient& ApiLookupClient::operator=(const ApiLookupClient& other) =
+    default;
+
+ApiLookupClient::ApiLookupClient(ApiLookupClient&& other) = default;
+
+ApiLookupClient& ApiLookupClient::operator=(ApiLookupClient&& other) = default;
+
 ApiLookupClient::~ApiLookupClient() = default;
 
 ApiLookupClient::LookupApiResponse ApiLookupClient::LookupApi(

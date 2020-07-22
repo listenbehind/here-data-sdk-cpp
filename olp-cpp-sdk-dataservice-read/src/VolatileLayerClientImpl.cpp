@@ -58,7 +58,8 @@ VolatileLayerClientImpl::VolatileLayerClientImpl(
     : catalog_(std::move(catalog)),
       layer_id_(std::move(layer_id)),
       settings_(std::move(settings)),
-      pending_requests_(std::make_shared<client::PendingRequests>()) {
+      pending_requests_(std::make_shared<client::PendingRequests>()),
+      lookup_client_(catalog_, settings_) {
   if (!settings_.cache) {
     settings_.cache = client::OlpClientSettingsFactory::CreateDefaultCache({});
   }
@@ -83,8 +84,8 @@ client::CancellationToken VolatileLayerClientImpl::GetPartitions(
 
     auto data_task = [=](client::CancellationContext context) {
       return repository::PartitionsRepository::GetVolatilePartitions(
-          std::move(catalog), std::move(layer_id), std::move(context),
-          std::move(request), std::move(settings));
+          lookup_client_, std::move(catalog), std::move(layer_id),
+          std::move(context), std::move(request), std::move(settings));
     };
 
     return AddTask(settings.task_scheduler, pending_requests_,
@@ -115,7 +116,7 @@ client::CancellationToken VolatileLayerClientImpl::GetData(
 
     auto partitions_task = [=](client::CancellationContext context) {
       return repository::DataRepository::GetVolatileData(
-          catalog, layer_id, request, context, settings);
+          lookup_client_, catalog, layer_id, request, context, settings);
     };
 
     return AddTask(settings.task_scheduler, pending_requests_,
@@ -210,8 +211,8 @@ client::CancellationToken VolatileLayerClientImpl::PrefetchTiles(
                             sliced_tiles.size(), key.c_str());
 
         auto sub_tiles = repository::PrefetchTilesRepository::GetSubTiles(
-            catalog, layer_id, request, boost::none, sliced_tiles, context,
-            settings);
+            lookup_client_, catalog, layer_id, request, boost::none,
+            sliced_tiles, context, settings);
 
         if (!sub_tiles.IsSuccessful()) {
           return sub_tiles.GetError();
@@ -269,7 +270,7 @@ client::CancellationToken VolatileLayerClientImpl::PrefetchTiles(
               settings.task_scheduler, pending_requests,
               [=](CancellationContext inner_context) {
                 auto data = repository::DataRepository::GetVolatileData(
-                    catalog, layer_id,
+                    lookup_client_, catalog, layer_id,
                     DataRequest().WithDataHandle(handle).WithBillingTag(
                         biling_tag),
                     inner_context, *shared_settings);

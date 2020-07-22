@@ -23,6 +23,7 @@
 #include <string>
 
 #include <olp/core/client/ApiError.h>
+#include <olp/core/client/ApiLookupClient.h>
 #include <olp/core/client/ApiResponse.h>
 #include <olp/core/client/CancellationContext.h>
 #include <olp/core/client/HRN.h>
@@ -61,15 +62,16 @@ class PrefetchTilesRepository {
       std::uint32_t max);
 
   static SubTilesResponse GetSubTiles(
-      const client::HRN& catalog, const std::string& layer_id,
-      const PrefetchTilesRequest& request,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer_id, const PrefetchTilesRequest& request,
       boost::optional<std::int64_t> version,
       const RootTilesForRequest& root_tiles,
       client::CancellationContext context,
       const client::OlpClientSettings& settings);
 
  protected:
-  static SubQuadsResponse GetSubQuads(const client::HRN& catalog,
+  static SubQuadsResponse GetSubQuads(client::ApiLookupClient client,
+                                      const client::HRN& catalog,
                                       const std::string& layer_id,
                                       const PrefetchTilesRequest& request,
                                       std::int64_t version, geo::TileKey tile,
@@ -78,8 +80,9 @@ class PrefetchTilesRepository {
                                       client::CancellationContext context);
 
   static SubQuadsResponse GetVolatileSubQuads(
-      const client::HRN& catalog, const std::string& layer_id,
-      const PrefetchTilesRequest& request, geo::TileKey tile, int32_t depth,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer_id, const PrefetchTilesRequest& request,
+      geo::TileKey tile, int32_t depth,
       const client::OlpClientSettings& settings,
       client::CancellationContext context);
 

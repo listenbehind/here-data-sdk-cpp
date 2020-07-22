@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include <olp/core/client/ApiLookupClient.h>
 #include <olp/core/client/CancellationContext.h>
 #include <olp/core/client/CancellationToken.h>
 #include <olp/core/client/HRN.h>
@@ -48,18 +49,18 @@ using QuadTreeIndexResponse = Response<QuadTreeIndex>;
 class PartitionsRepository {
  public:
   static PartitionsResponse GetVersionedPartitions(
-      client::HRN catalog, std::string layer,
+      client::ApiLookupClient client, client::HRN catalog, std::string layer,
       client::CancellationContext cancellation_context,
       read::PartitionsRequest data_request, client::OlpClientSettings settings);
 
   static PartitionsResponse GetVolatilePartitions(
-      client::HRN catalog, std::string layer,
+      client::ApiLookupClient client, client::HRN catalog, std::string layer,
       client::CancellationContext cancellation_context,
       read::PartitionsRequest data_request, client::OlpClientSettings settings);
 
   static PartitionsResponse GetPartitionById(
-      const client::HRN& catalog, const std::string& layer,
-      boost::optional<int64_t> version,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer, boost::optional<int64_t> version,
       client::CancellationContext cancellation_context,
       const DataRequest& data_request, client::OlpClientSettings settings);
 
@@ -67,13 +68,15 @@ class PartitionsRepository {
                                                const std::string& partition);
 
   static PartitionResponse GetAggregatedTile(
-      const client::HRN& catalog, const std::string& layer,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer,
       client::CancellationContext cancellation_context,
       const TileRequest& request, boost::optional<int64_t> version,
       const client::OlpClientSettings& settings);
 
   static PartitionResponse GetTile(
-      const client::HRN& catalog, const std::string& layer,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer,
       client::CancellationContext cancellation_context,
       const TileRequest& request, boost::optional<int64_t> version,
       const client::OlpClientSettings& settings);
@@ -87,13 +90,14 @@ class PartitionsRepository {
 
  private:
   static QuadTreeIndexResponse GetQuadTreeIndexForTile(
-      const client::HRN& catalog, const std::string& layer,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer,
       client::CancellationContext cancellation_context,
       const TileRequest& request, boost::optional<int64_t> version,
       const client::OlpClientSettings& settings);
 
   static PartitionsResponse GetPartitions(
-      client::HRN catalog, std::string layer,
+      client::ApiLookupClient client, client::HRN catalog, std::string layer,
       client::CancellationContext cancellation_context,
       read::PartitionsRequest request,
       const client::OlpClientSettings& settings,

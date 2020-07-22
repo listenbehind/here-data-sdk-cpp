@@ -26,7 +26,6 @@
 #include <olp/core/client/Condition.h>
 #include <olp/core/logging/Log.h>
 
-#include "ApiClientLookup.h"
 #include "CatalogCacheRepository.h"
 #include "ExecuteOrSchedule.inl"
 #include "generated/api/ConfigApi.h"
@@ -45,8 +44,9 @@ namespace read {
 namespace repository {
 
 CatalogResponse CatalogRepository::GetCatalog(
-    client::HRN catalog, client::CancellationContext cancellation_context,
-    CatalogRequest request, client::OlpClientSettings settings) {
+    client::ApiLookupClient client, client::HRN catalog,
+    client::CancellationContext cancellation_context, CatalogRequest request,
+    client::OlpClientSettings settings) {
   const auto request_key = request.CreateKey();
   const auto fetch_options = request.GetFetchOption();
 
@@ -70,16 +70,17 @@ CatalogResponse CatalogRepository::GetCatalog(
     }
   }
 
-  auto config_api = ApiClientLookup::LookupApi(
-      catalog, cancellation_context, "config", "v1", fetch_options, settings);
+  auto config_api = client.LookupApi(
+      "config", "v1", static_cast<client::FetchOptions>(fetch_options),
+      cancellation_context);
 
   if (!config_api.IsSuccessful()) {
     return config_api.GetError();
   }
 
-  const client::OlpClient& client = config_api.GetResult();
+  const client::OlpClient& config_client = config_api.GetResult();
   auto catalog_response =
-      ConfigApi::GetCatalog(client, catalog.ToCatalogHRNString(),
+      ConfigApi::GetCatalog(config_client, catalog.ToCatalogHRNString(),
                             request.GetBillingTag(), cancellation_context);
   if (catalog_response.IsSuccessful() && fetch_options != OnlineOnly) {
     repository.Put(catalog_response.GetResult());
@@ -100,7 +101,8 @@ CatalogResponse CatalogRepository::GetCatalog(
 }
 
 CatalogVersionResponse CatalogRepository::GetLatestVersion(
-    client::HRN catalog, client::CancellationContext cancellation_context,
+    client::ApiLookupClient client, client::HRN catalog,
+    client::CancellationContext cancellation_context,
     CatalogVersionRequest request, client::OlpClientSettings settings) {
   repository::CatalogCacheRepository repository(catalog, settings.cache);
 
@@ -121,18 +123,18 @@ CatalogVersionResponse CatalogRepository::GetLatestVersion(
     }
   }
 
-  auto metadata_api = ApiClientLookup::LookupApi(
-      std::move(catalog), cancellation_context, "metadata", "v1", fetch_option,
-      std::move(settings));
+  auto metadata_api = client.LookupApi(
+      "metadata", "v1", static_cast<client::FetchOptions>(fetch_option),
+      cancellation_context);
 
   if (!metadata_api.IsSuccessful()) {
     return metadata_api.GetError();
   }
 
-  const client::OlpClient& client = metadata_api.GetResult();
+  const client::OlpClient& metadata_client = metadata_api.GetResult();
 
   auto version_response = MetadataApi::GetLatestCatalogVersion(
-      client, -1, request.GetBillingTag(), cancellation_context);
+      metadata_client, -1, request.GetBillingTag(), cancellation_context);
 
   if (version_response.IsSuccessful() && fetch_option != OnlineOnly) {
     repository.PutVersion(version_response.GetResult());
@@ -154,21 +156,20 @@ CatalogVersionResponse CatalogRepository::GetLatestVersion(
 }
 
 VersionsResponse CatalogRepository::GetVersionsList(
-    const client::HRN& catalog,
+    client::ApiLookupClient client,
     client::CancellationContext cancellation_context,
-    const VersionsRequest& request, const client::OlpClientSettings& settings) {
-  auto metadata_api = ApiClientLookup::LookupApi(
-      std::move(catalog), cancellation_context, "metadata", "v1", OnlineOnly,
-      std::move(settings));
+    const VersionsRequest& request) {
+  auto metadata_api = client.LookupApi("metadata", "v1", client::OnlineOnly,
+                                       cancellation_context);
 
   if (!metadata_api.IsSuccessful()) {
     return metadata_api.GetError();
   }
 
-  const client::OlpClient& client = metadata_api.GetResult();
+  const client::OlpClient& metadata_client = metadata_api.GetResult();
 
   return MetadataApi::ListVersions(
-      client, request.GetStartVersion(), request.GetEndVersion(),
+      metadata_client, request.GetStartVersion(), request.GetEndVersion(),
       request.GetBillingTag(), cancellation_context);
 }
 

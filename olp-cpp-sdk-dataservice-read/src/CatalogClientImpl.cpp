@@ -40,7 +40,9 @@ constexpr auto kLogTag = "CatalogClientImpl";
 
 CatalogClientImpl::CatalogClientImpl(client::HRN catalog,
                                      client::OlpClientSettings settings)
-    : catalog_(std::move(catalog)), settings_(std::move(settings)) {
+    : catalog_(std::move(catalog)),
+      settings_(std::move(settings)),
+      lookup_client_(catalog_, settings_) {
   if (!settings_.cache) {
     settings_.cache = client::OlpClientSettingsFactory::CreateDefaultCache({});
   }
@@ -70,8 +72,8 @@ client::CancellationToken CatalogClientImpl::GetCatalog(
 
     auto get_catalog_task = [=](client::CancellationContext context) {
       return repository::CatalogRepository::GetCatalog(
-          std::move(catalog), std::move(context), std::move(request),
-          std::move(settings));
+          lookup_client_, std::move(catalog), std::move(context),
+          std::move(request), std::move(settings));
     };
 
     return AddTask(task_scheduler_, pending_requests_,
@@ -103,8 +105,8 @@ client::CancellationToken CatalogClientImpl::GetLatestVersion(
 
     auto get_latest_version_task = [=](client::CancellationContext context) {
       return repository::CatalogRepository::GetLatestVersion(
-          std::move(catalog), std::move(context), std::move(request),
-          std::move(settings));
+          lookup_client_, std::move(catalog), std::move(context),
+          std::move(request), std::move(settings));
     };
 
     return AddTask(task_scheduler_, pending_requests_,
@@ -130,8 +132,8 @@ client::CancellationToken CatalogClientImpl::ListVersions(
     VersionsRequest request, VersionsResponseCallback callback) {
   auto versions_list_task =
       [=](client::CancellationContext context) -> VersionsResponse {
-    return repository::CatalogRepository::GetVersionsList(catalog_, context,
-                                                          request, settings_);
+    return repository::CatalogRepository::GetVersionsList(lookup_client_,
+                                                          context, request);
   };
 
   return AddTask(task_scheduler_, pending_requests_,

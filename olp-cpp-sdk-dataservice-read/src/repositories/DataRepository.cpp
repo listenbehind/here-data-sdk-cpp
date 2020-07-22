@@ -26,7 +26,6 @@
 
 #include <olp/core/client/Condition.h>
 #include <olp/core/logging/Log.h>
-#include "ApiClientLookup.h"
 #include "CatalogRepository.h"
 #include "DataCacheRepository.h"
 #include "ExecuteOrSchedule.inl"
@@ -57,12 +56,12 @@ constexpr auto kVolatileBlobService = "volatile-blob";
 }  // namespace
 
 DataResponse DataRepository::GetVersionedTile(
-    const client::HRN& catalog, const std::string& layer_id,
-    const TileRequest& request, int64_t version,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer_id, const TileRequest& request, int64_t version,
     client::CancellationContext context,
     const client::OlpClientSettings& settings) {
-  auto response = PartitionsRepository::GetTile(catalog, layer_id, context,
-                                                request, version, settings);
+  auto response = PartitionsRepository::GetTile(
+      client, catalog, layer_id, context, request, version, settings);
 
   if (!response.IsSuccessful()) {
     OLP_SDK_LOG_WARNING_F(
@@ -80,12 +79,14 @@ DataResponse DataRepository::GetVersionedTile(
                                 .WithFetchOption(request.GetFetchOption());
 
   return repository::DataRepository::GetBlobData(
-      catalog, layer_id, kBlobService, data_request, context, settings);
+      std::move(client), catalog, layer_id, kBlobService, data_request, context,
+      settings);
 }
 
 DataResponse DataRepository::GetVersionedData(
-    const client::HRN& catalog, const std::string& layer_id, int64_t version,
-    DataRequest request, client::CancellationContext context,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer_id, int64_t version, DataRequest request,
+    client::CancellationContext context,
     const client::OlpClientSettings& settings) {
   if (request.GetDataHandle() && request.GetPartitionId()) {
     return {{client::ErrorCode::PreconditionFailed,
@@ -96,7 +97,7 @@ DataResponse DataRepository::GetVersionedData(
     // get data handle for a partition to be queried
     auto partitions_response =
         repository::PartitionsRepository::GetPartitionById(
-            catalog, layer_id, version, context, request, settings);
+            client, catalog, layer_id, version, context, request, settings);
 
     if (!partitions_response.IsSuccessful()) {
       return partitions_response.GetError();
@@ -119,13 +120,15 @@ DataResponse DataRepository::GetVersionedData(
   }
 
   // finally get the data using a data handle
-  return repository::DataRepository::GetBlobData(
-      catalog, layer_id, kBlobService, request, context, settings);
+  return repository::DataRepository::GetBlobData(std::move(client), catalog,
+                                                 layer_id, kBlobService,
+                                                 request, context, settings);
 }
 
 DataResponse DataRepository::GetBlobData(
-    const client::HRN& catalog, const std::string& layer,
-    const std::string& service, const DataRequest& data_request,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer, const std::string& service,
+    const DataRequest& data_request,
     client::CancellationContext cancellation_context,
     const client::OlpClientSettings& settings) {
   auto fetch_option = data_request.GetFetchOption();
@@ -162,8 +165,9 @@ DataResponse DataRepository::GetBlobData(
     }
   }
 
-  auto blob_api = ApiClientLookup::LookupApi(
-      catalog, cancellation_context, service, "v1", fetch_option, settings);
+  auto blob_api = client.LookupApi(
+      service, "v1", static_cast<client::FetchOptions>(fetch_option),
+      cancellation_context);
 
   if (!blob_api.IsSuccessful()) {
     return blob_api.GetError();
@@ -200,8 +204,9 @@ DataResponse DataRepository::GetBlobData(
 }
 
 DataResponse DataRepository::GetVolatileData(
-    const client::HRN& catalog, const std::string& layer_id,
-    DataRequest request, client::CancellationContext context,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer_id, DataRequest request,
+    client::CancellationContext context,
     const client::OlpClientSettings& settings) {
   if (request.GetDataHandle() && request.GetPartitionId()) {
     return {{client::ErrorCode::PreconditionFailed,
@@ -211,7 +216,7 @@ DataResponse DataRepository::GetVolatileData(
   if (!request.GetDataHandle()) {
     auto partitions_response =
         repository::PartitionsRepository::GetPartitionById(
-            catalog, layer_id, boost::none, context, request, settings);
+            client, catalog, layer_id, boost::none, context, request, settings);
 
     if (!partitions_response.IsSuccessful()) {
       return partitions_response.GetError();
@@ -232,8 +237,9 @@ DataResponse DataRepository::GetVolatileData(
     request.WithDataHandle(partitions.front().GetDataHandle());
   }
 
-  return repository::DataRepository::GetBlobData(
-      catalog, layer_id, kVolatileBlobService, request, context, settings);
+  return repository::DataRepository::GetBlobData(std::move(client), catalog,
+                                                 layer_id, kVolatileBlobService,
+                                                 request, context, settings);
 }
 
 PORTING_POP_WARNINGS()

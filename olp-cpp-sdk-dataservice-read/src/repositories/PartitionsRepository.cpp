@@ -23,7 +23,6 @@
 
 #include <olp/core/client/Condition.h>
 #include <olp/core/logging/Log.h>
-#include "ApiClientLookup.h"
 #include "CatalogRepository.h"
 #include "NamedMutex.h"
 #include "PartitionsCacheRepository.h"
@@ -107,14 +106,14 @@ namespace read {
 namespace repository {
 
 PartitionsResponse PartitionsRepository::GetVersionedPartitions(
-    client::HRN catalog, std::string layer,
+    client::ApiLookupClient client, client::HRN catalog, std::string layer,
     client::CancellationContext cancellation_context, PartitionsRequest request,
     client::OlpClientSettings settings) {
   if (!request.GetVersion()) {
     // get latest version of the layer if it wasn't set by the user
     auto latest_version_response =
         repository::CatalogRepository::GetLatestVersion(
-            catalog, cancellation_context,
+            client, catalog, cancellation_context,
             CatalogVersionRequest()
                 .WithFetchOption(request.GetFetchOption())
                 .WithBillingTag(request.GetBillingTag()),
@@ -126,13 +125,13 @@ PartitionsResponse PartitionsRepository::GetVersionedPartitions(
     request.WithVersion(latest_version_response.GetResult().GetVersion());
   }
 
-  return GetPartitions(std::move(catalog), std::move(layer),
+  return GetPartitions(std::move(client), std::move(catalog), std::move(layer),
                        std::move(cancellation_context), std::move(request),
                        std::move(settings));
 }
 
 PartitionsResponse PartitionsRepository::GetVolatilePartitions(
-    client::HRN catalog, std::string layer,
+    client::ApiLookupClient client, client::HRN catalog, std::string layer,
     client::CancellationContext cancellation_context, PartitionsRequest request,
     client::OlpClientSettings settings) {
   request.WithVersion(boost::none);
@@ -142,7 +141,7 @@ PartitionsResponse PartitionsRepository::GetVolatilePartitions(
                              .WithFetchOption(request.GetFetchOption());
 
   auto catalog_response = repository::CatalogRepository::GetCatalog(
-      catalog, cancellation_context, catalog_request, settings);
+      client, catalog, cancellation_context, catalog_request, settings);
 
   if (!catalog_response.IsSuccessful()) {
     return catalog_response.GetError();
@@ -154,13 +153,13 @@ PartitionsResponse PartitionsRepository::GetVolatilePartitions(
     return expiry_response.GetError();
   }
 
-  return GetPartitions(std::move(catalog), std::move(layer),
+  return GetPartitions(std::move(client), std::move(catalog), std::move(layer),
                        cancellation_context, std::move(request),
                        std::move(settings), expiry_response.MoveResult());
 }
 
 PartitionsResponse PartitionsRepository::GetPartitions(
-    client::HRN catalog, std::string layer,
+    client::ApiLookupClient client, client::HRN catalog, std::string layer,
     client::CancellationContext cancellation_context, PartitionsRequest request,
     const client::OlpClientSettings& settings, boost::optional<time_t> expiry) {
   auto fetch_option = request.GetFetchOption();
@@ -189,9 +188,9 @@ PartitionsResponse PartitionsRepository::GetPartitions(
   const auto& partition_ids = request.GetPartitionIds();
 
   if (partition_ids.empty()) {
-    auto metadata_api =
-        ApiClientLookup::LookupApi(catalog, cancellation_context, "metadata",
-                                   "v1", fetch_option, std::move(settings));
+    auto metadata_api = client.LookupApi(
+        "metadata", "v1", static_cast<client::FetchOptions>(fetch_option),
+        cancellation_context);
 
     if (!metadata_api.IsSuccessful()) {
       return metadata_api.GetError();
@@ -202,9 +201,9 @@ PartitionsResponse PartitionsRepository::GetPartitions(
         request.GetAdditionalFields(), boost::none, request.GetBillingTag(),
         cancellation_context);
   } else {
-    auto query_api =
-        ApiClientLookup::LookupApi(catalog, cancellation_context, "query", "v1",
-                                   fetch_option, std::move(settings));
+    auto query_api = client.LookupApi(
+        "query", "v1", static_cast<client::FetchOptions>(fetch_option),
+        cancellation_context);
 
     if (!query_api.IsSuccessful()) {
       return query_api.GetError();
@@ -240,8 +239,8 @@ PartitionsResponse PartitionsRepository::GetPartitions(
 }
 
 PartitionsResponse PartitionsRepository::GetPartitionById(
-    const client::HRN& catalog, const std::string& layer,
-    boost::optional<int64_t> version,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer, boost::optional<int64_t> version,
     client::CancellationContext cancellation_context,
     const DataRequest& data_request, client::OlpClientSettings settings) {
   const auto& partition_id = data_request.GetPartitionId();
@@ -289,19 +288,19 @@ PartitionsResponse PartitionsRepository::GetPartitionById(
     }
   }
 
-  auto query_api =
-      ApiClientLookup::LookupApi(catalog, cancellation_context, "query", "v1",
-                                 fetch_option, std::move(settings));
+  auto query_api = client.LookupApi(
+      "query", "v1", static_cast<client::FetchOptions>(fetch_option),
+      cancellation_context);
 
   if (!query_api.IsSuccessful()) {
     return query_api.GetError();
   }
 
-  const client::OlpClient& client = query_api.GetResult();
+  const client::OlpClient& query_client = query_api.GetResult();
 
   PartitionsResponse query_response = QueryApi::GetPartitionsbyId(
-      client, layer, partitions, version, {}, data_request.GetBillingTag(),
-      cancellation_context);
+      query_client, layer, partitions, version, {},
+      data_request.GetBillingTag(), cancellation_context);
 
   if (query_response.IsSuccessful() && fetch_option != OnlineOnly) {
     OLP_SDK_LOG_DEBUG_F(kLogTag,
@@ -336,9 +335,9 @@ model::Partition PartitionsRepository::PartitionFromSubQuad(
   return ret;
 }
 QuadTreeIndexResponse PartitionsRepository::GetQuadTreeIndexForTile(
-    const client::HRN& catalog, const std::string& layer,
-    client::CancellationContext context, const TileRequest& request,
-    boost::optional<int64_t> version,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer, client::CancellationContext context,
+    const TileRequest& request, boost::optional<int64_t> version,
     const client::OlpClientSettings& settings) {
   auto fetch_option = request.GetFetchOption();
   const auto& tile_key = request.GetTileKey();
@@ -376,8 +375,8 @@ QuadTreeIndexResponse PartitionsRepository::GetQuadTreeIndexForTile(
   }
 
   // quad tree data not found in the cache
-  auto query_api = ApiClientLookup::LookupApi(
-      catalog, context, "query", "v1", request.GetFetchOption(), settings);
+  auto query_api = client.LookupApi(
+      "query", "v1", static_cast<client::FetchOptions>(fetch_option), context);
 
   if (!query_api.IsSuccessful()) {
     OLP_SDK_LOG_WARNING_F(kLogTag,
@@ -424,12 +423,13 @@ QuadTreeIndexResponse PartitionsRepository::GetQuadTreeIndexForTile(
 }
 
 PartitionResponse PartitionsRepository::GetAggregatedTile(
-    const client::HRN& catalog, const std::string& layer,
-    client::CancellationContext cancellation_context,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer, client::CancellationContext cancellation_context,
     const TileRequest& request, boost::optional<int64_t> version,
     const client::OlpClientSettings& settings) {
-  auto quad_tree_response = GetQuadTreeIndexForTile(
-      catalog, layer, cancellation_context, request, version, settings);
+  auto quad_tree_response =
+      GetQuadTreeIndexForTile(std::move(client), catalog, layer,
+                              cancellation_context, request, version, settings);
   if (!quad_tree_response.IsSuccessful()) {
     return quad_tree_response.GetError();
   }
@@ -437,12 +437,13 @@ PartitionResponse PartitionsRepository::GetAggregatedTile(
 }
 
 PartitionResponse PartitionsRepository::GetTile(
-    const client::HRN& catalog, const std::string& layer,
-    client::CancellationContext cancellation_context,
+    client::ApiLookupClient client, const client::HRN& catalog,
+    const std::string& layer, client::CancellationContext cancellation_context,
     const TileRequest& request, boost::optional<int64_t> version,
     const client::OlpClientSettings& settings) {
-  auto quad_tree_response = GetQuadTreeIndexForTile(
-      catalog, layer, cancellation_context, request, version, settings);
+  auto quad_tree_response =
+      GetQuadTreeIndexForTile(std::move(client), catalog, layer,
+                              cancellation_context, request, version, settings);
   if (!quad_tree_response.IsSuccessful()) {
     return quad_tree_response.GetError();
   }

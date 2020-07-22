@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <olp/core/client/ApiLookupClient.h>
 #include <olp/core/client/CancellationContext.h>
 #include <olp/core/client/CancellationToken.h>
 #include <olp/core/client/HRN.h>
@@ -35,24 +36,27 @@ namespace repository {
 class DataRepository final {
  public:
   static DataResponse GetVersionedTile(
-      const client::HRN& catalog, const std::string& layer_id,
-      const TileRequest& request, int64_t version,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer_id, const TileRequest& request, int64_t version,
       client::CancellationContext context,
       const client::OlpClientSettings& settings);
 
   static DataResponse GetVersionedData(
-      const client::HRN& catalog, const std::string& layer_id, int64_t version,
-      DataRequest data_request, client::CancellationContext context,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer_id, int64_t version, DataRequest data_request,
+      client::CancellationContext context,
       const client::OlpClientSettings& settings);
 
   static DataResponse GetVolatileData(
-      const client::HRN& catalog, const std::string& layer_id,
-      DataRequest request, client::CancellationContext context,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer_id, DataRequest request,
+      client::CancellationContext context,
       const client::OlpClientSettings& settings);
 
   static DataResponse GetBlobData(
-      const client::HRN& catalog, const std::string& layer,
-      const std::string& service, const DataRequest& data_request,
+      client::ApiLookupClient client, const client::HRN& catalog,
+      const std::string& layer, const std::string& service,
+      const DataRequest& data_request,
       client::CancellationContext cancellation_context,
       const client::OlpClientSettings& settings);
 };
